@@ -27,3 +27,16 @@ $ export NS_LOG=UdpEchoClientApplication=level_all
 ![](http://t3.qpic.cn/mblogpic/247608dcb82424a6394e/120)
 
 ![](http://t3.qpic.cn/mblogpic/a22ce7b7fa77b20e4106/120)
+
+4、NS3安装过程
+下载文件：
+wget http://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
+解压：
+tar -xjf ns-allinone-3.17.tar.bz2
+编译：
+cd ns-allinone-3.21
+./build.py  
+cd ns-3.21
+./waf configure
+./waf
+
