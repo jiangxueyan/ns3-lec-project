@@ -20,3 +20,10 @@ $ export NS_LOG=UdpEchoClientApplication=level_all
 2、用wireshark打开.pcap文件
 
 ![](http://t3.qpic.cn/mblogpic/ef516ee365beffd86f2e/120)
+
+3、PyViz截图
+
+
+![](http://t3.qpic.cn/mblogpic/247608dcb82424a6394e/120)
+
+![](http://t3.qpic.cn/mblogpic/a22ce7b7fa77b20e4106/120)
