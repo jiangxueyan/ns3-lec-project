@@ -14,30 +14,30 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "ns3/core-module.h"
+#include "ns3/point-to-point-module.h"
 #include "ns3/lte-helper.h"
 #include "ns3/epc-helper.h"
-#include "ns3/point-to-point-module.h"
+#include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/ipv4-global-routing-helper.h"
-#include "ns3/applications-module.h"
-#include "ns3/wifi-module.h"
+#include "ns3/internet-module.h"
 #include "ns3/mobility-module.h"
 #include "ns3/lte-module.h"
-#include "ns3/internet-module.h"
+#include "ns3/wifi-module.h"
+#include "ns3/applications-module.h"
+#include "ns3/point-to-point-helper.h"
 #include "ns3/config-store.h"
 
 // Default Network Topology
 //
-//   Wifi2 10.1.3.0
+//   Wifi2 10.1.2.0
 //                 AP
 //  *    *    *    *
-//  |    |    |    |                  10.1.1.0
-// n13  ...   n8   n0 <----------EPC--------- n1   n2   n3   n4   n5   n6   n7
-//                                    p2p      |    |    |    |    |    |    |
-//                                              *    *    *    *    *    *    * 
-                                               AP
-//                                             wifi1 10.1.2.0
+//  |    |    |    |          7.0.0.0
+// n13  ...   n8   n0 ----------pgw--------- n1   n2   n3   n4   n5   n6   n7
+//                                            |    |    |    |    |    |    |
+//                                            *    *    *    *    *    *    * //                                           AP
+//                                             wifi1 10.1.1.0
 
 using namespace ns3;
 
@@ -72,7 +72,7 @@ main (int argc, char *argv[])
 
   if ((nWifi1 > 18) || (nWifi2 > 18))
     {
-      std::cout << "Number of wifi nodes " << nWifi1 << " "<< nWifi2
+      std::cout << "Number of wifi nodes " << nWifi1 << " "<< nWifi2<<
                    " specified exceeds the mobility bounding box" << std::endl;
       exit(1);
     }
@@ -93,10 +93,7 @@ main (int argc, char *argv[])
   NodeContainer enbNodes;
   enbNodes.Create(numberOfNodes);
   ueNodes.Create(numberOfNodes);
-  NetDeviceContainer enbLteDevs = lteHelper->InstallEnbDevice(enbNodes);
-  NetDeviceContainer ueLteDevs = lteHelper->InstallUeDevice(ueNodes);
-
-
+  
  //create wifi nodes :wifinet1
   NodeContainer wifiStaNodes1;
   wifiStaNodes1.Create(nWifi1);
@@ -108,7 +105,7 @@ main (int argc, char *argv[])
   WifiHelper wifi1 = WifiHelper::Default ();
   wifi1.SetRemoteStationManager("ns3::AarfWifiManager");
 
-  NqosWifiMacHelper mac1 = NqosWifiMacHelper::Default();
+  NqosWifiMacHelper mac1 = NqosWifiMacHelper::Default ();
 
   Ssid ssid1 = Ssid("ns-3-ssid");
   mac1.SetType ("ns3::StaWifiMac",
@@ -165,6 +162,7 @@ main (int argc, char *argv[])
   mobility.SetPositionAllocator(positionAlloc);
   mobility.Install(enbNodes);
   mobility.Install(ueNodes);
+
  // Install Mobility Model:wifinet1
   mobility.SetMobilityModel ("ns3::RandomWalk2dMobilityModel",
 	"Bounds", RectangleValue (Rectangle (-250, 250, -250, 250)));
@@ -196,6 +194,10 @@ main (int argc, char *argv[])
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (wifiApNode1);
   mobility.Install (pgw);
+  pgw->GetObject<ConstantPositionMobilityModel>()->SetPosition(
+Vector(0, 10, 0));
+  wifiApNode1.Get(0)->GetObject<ConstantPositionMobilityModel>()->SetPosition(
+Vector(-25, 0, 0));
 
 // Install Mobility Model:wifinet2
   
@@ -228,7 +230,12 @@ main (int argc, char *argv[])
 
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (wifiApNode2);
+  wifiApNode2.Get(0)->GetObject<ConstantPositionMobilityModel>()->SetPosition(
+Vector(25, 0, 0));
 
+// Install LTE Devices to the nodes
+  NetDeviceContainer enbLteDevs = lteHelper->InstallEnbDevice(enbNodes);
+  NetDeviceContainer ueLteDevs = lteHelper->InstallUeDevice(ueNodes);
 // Install the IP stack 
   InternetStackHelper internet;
   internet.Install(ueNodes);
@@ -267,27 +274,31 @@ main (int argc, char *argv[])
 //install echo client and server
   UdpEchoServerHelper echoServer (9);
   ApplicationContainer serverApps = echoServer.Install(
-	wifiApNodeLeft.Get(0));
+	wifiApNode1.Get(0));
   serverApps.Start(Seconds(0.0));
   serverApps.Stop(Seconds(20.0));
 
-  UdpEchoClientHelper echoClient(Ipv4Address("7.0.0.2"), 9);
+  UdpEchoClientHelper echoClient(Ipv4Address("7.0.0.0"), 9);
   echoClient.SetAttribute("MaxPackets", UintegerValue(4));
   echoClient.SetAttribute("Interval", TimeValue(Seconds(0.1)));
   echoClient.SetAttribute("PacketSize", UintegerValue(512));
 	
-  for (int i = 0; i < (int) nWifi1; i++) 
+  for (int i = 0; i < (int) nWifi2; i++) 
  {
   ApplicationContainer clientApps = echoClient.Install(
-  wifiStaNodesRight.Get(nWifi1 - 1 - i));
+  wifiStaNodes2.Get(nWifi2 - 1 - i));
   clientApps.Start(Seconds(2.0 + i));
   clientApps.Stop(Seconds(10.0 + i));
   }
-  phy1.EnablePcap("wifi1", apDevice1.Get(0));
-  phy2.EnablePcap("wifi2", apDevice2.Get(0));
+
+  AsciiTraceHelper ascii_1,ascii_2;
+  phy1.EnableAscii (ascii_1.CreateFileStream("wifi1.tr"), apDevices1.Get(0));
+  phy2.EnableAscii (ascii_2.CreateFileStream("wifi2.tr"), apDevices2.Get(0));
+  phy1.EnablePcap("wifi1", apDevices1.Get(0));
+  phy2.EnablePcap("wifi2", apDevices2.Get(0));
 
   Simulator::Stop(Seconds(20.0));
   Simulator::Run ();
-  Simulator::Destroy ();
+  Simulator::Destroy();
   return 0;
 }
